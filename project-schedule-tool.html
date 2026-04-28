@@ -156,6 +156,7 @@ body.dark .cal-cell.holiday-cell{background:rgba(232,80,80,.08);}
     <p class="subtitle">Gantt · Calendar · Timeline — Confluence / Markdown 임베드용</p>
   </div>
   <div style="display:flex;gap:8px;">
+    <button class="btn" onclick="resetAll()">🗑 초기화</button>
     <button class="btn" onclick="importJSON()">📂 불러오기</button>
     <button class="btn" id="theme-btn" onclick="toggleTheme()">🌙 다크</button>
   </div>
@@ -376,17 +377,9 @@ const HOLIDAYS={
 // ══════════════════════════════════════
 let scenarios=[{
   id:1, name:'1안',
-  groups:['4/20 ~ 스펙정리','4/24(금) ~'],
-  tasks:[
-    {id:1,name:'스펙정리 완료',        group:'4/20 ~ 스펙정리',start:'2026-04-20',end:'2026-04-22',status:'doing', color:'#4a7de8',note:'',assignee:'',progress:60},
-    {id:2,name:'앱 디자인 가이드 완료', group:'4/24(금) ~',    start:'2026-04-24',end:'2026-04-24',status:'todo',  color:'#f5a623',note:'',assignee:'',progress:0},
-    {id:3,name:'QA 앱 빌드',           group:'4/24(금) ~',    start:'2026-04-24',end:'2026-04-28',status:'todo',  color:'#8b6fef',note:'',assignee:'',progress:0},
-    {id:4,name:'스토어 등록정보 준비',  group:'4/24(금) ~',    start:'2026-04-24',end:'2026-04-30',status:'todo',  color:'#1dbfad',note:'',assignee:'',progress:0},
-    {id:5,name:'앱 1차 심사요청',       group:'4/24(금) ~',    start:'2026-05-10',end:'2026-05-11',status:'todo',  color:'#27b36b',note:'',assignee:'',progress:0},
-    {id:6,name:'앱 2차 심사요청',       group:'4/24(금) ~',    start:'2026-05-17',end:'2026-05-18',status:'todo',  color:'#27b36b',note:'',assignee:'',progress:0},
-    {id:7,name:'앱데이터 리포트 준비',  group:'4/24(금) ~',    start:'2026-05-25',end:'2026-05-29',status:'todo',  color:'#60a5fa',note:'',assignee:'',progress:0},
-  ],
-  nextId:8,
+  groups:[],
+  tasks:[],
+  nextId:1,
 }];
 let curScId=1, scNextId=2;
 let groups, tasks, nextId;
@@ -448,6 +441,14 @@ function switchTab(name){
 function toggleTheme(){
   document.body.classList.toggle('dark');
   $('theme-btn').textContent=document.body.classList.contains('dark')?'☀️ 라이트':'🌙 다크';
+}
+function resetAll(){
+  if(!confirm('모든 시나리오와 작업이 삭제됩니다.\n초기화할까요?'))return;
+  scenarios=[{id:1,name:'1안',groups:[],tasks:[],nextId:1}];
+  curScId=1;scNextId=2;
+  loadSc(1);
+  renderScenarioBar();
+  renderAll();
 }
 
 // ══════════════════════════════════════
@@ -655,7 +656,7 @@ function renderCalendar(){
   const rem=(first.getDay()+last.getDate())%7;
   if(rem) for(let d=1;d<=7-rem;d++)   dates.push({date:new Date(calY,calM+1,d),other:true});
 
-  // 작업 슬롯 배정
+  // 작업 슬롯 배정 (주말/공휴일 제외)
   const taskRows={};
   const slotMap={};
   dates.forEach(({date})=>{slotMap[fd(date)]=[];});
@@ -665,6 +666,7 @@ function renderCalendar(){
       let conflict=false;
       for(const {date} of dates){
         const ds=fd(date);
+        if(isOffDay(ds))continue; // 주말/휴일 건너뜀
         if(ds>=t.start&&ds<=t.end&&slotMap[ds]&&slotMap[ds][row]){conflict=true;break;}
       }
       if(!conflict)break;
@@ -673,6 +675,7 @@ function renderCalendar(){
     taskRows[t.id]=row;
     dates.forEach(({date})=>{
       const ds=fd(date);
+      if(isOffDay(ds))return; // 주말/휴일에는 슬롯 배정 안 함
       if(ds>=t.start&&ds<=t.end){
         if(!slotMap[ds])slotMap[ds]=[];
         slotMap[ds][row]=t.id;
@@ -692,23 +695,26 @@ function renderCalendar(){
     const hdayLbl=hday?`<div style="font-size:10px;color:var(--red);margin-bottom:2px;font-weight:600;">${hday}</div>`:'';
 
     let evHtml='';
-    for(let row=0;row<MAX_ROWS;row++){
-      const tid=(slotMap[ds]||[])[row];
-      if(!tid){evHtml+=`<div class="cal-ev-placeholder"></div>`;continue;}
-      const t=tasks.find(x=>x.id===tid);
-      if(!t){evHtml+=`<div class="cal-ev-placeholder"></div>`;continue;}
-      const isStart=ds===t.start, isEnd=ds===t.end;
-      const isWeekStart=date.getDay()===0, isWeekEnd=date.getDay()===6;
-      const showLabel=isStart||isWeekStart;
-      let spanCls='span-mid';
-      if(isStart&&isEnd)spanCls='span-only';
-      else if(isStart||isWeekStart)spanCls='span-start';
-      else if(isEnd||isWeekEnd)spanCls='span-end';
-      evHtml+=`<div class="cal-ev ${spanCls}" style="background:${t.color}28;color:${t.color};" onclick="openModal(${t.id})">
-        ${showLabel?t.name:''}
-      </div>`;
+    const isOff=isOffDay(ds);
+    if(!isOff){
+      for(let row=0;row<MAX_ROWS;row++){
+        const tid=(slotMap[ds]||[])[row];
+        if(!tid){evHtml+=`<div class="cal-ev-placeholder"></div>`;continue;}
+        const t=tasks.find(x=>x.id===tid);
+        if(!t){evHtml+=`<div class="cal-ev-placeholder"></div>`;continue;}
+        const isStart=ds===t.start, isEnd=ds===t.end;
+        const isWeekStart=date.getDay()===0, isWeekEnd=date.getDay()===6;
+        const showLabel=isStart||isWeekStart;
+        let spanCls='span-mid';
+        if(isStart&&isEnd)spanCls='span-only';
+        else if(isStart||isWeekStart)spanCls='span-start';
+        else if(isEnd||isWeekEnd)spanCls='span-end';
+        evHtml+=`<div class="cal-ev ${spanCls}" style="background:${t.color}28;color:${t.color};" onclick="openModal(${t.id})">
+          ${showLabel?t.name:''}
+        </div>`;
+      }
     }
-    const extra=Object.values(slotMap[ds]||[]).filter(Boolean).length-MAX_ROWS;
+    const extra=isOff?0:Object.values(slotMap[ds]||[]).filter(Boolean).length-MAX_ROWS;
     h+=`<div class="${cls}">
       <div class="day-num" style="${dnStyle}">${date.getDate()}</div>
       ${hdayLbl}${evHtml}
