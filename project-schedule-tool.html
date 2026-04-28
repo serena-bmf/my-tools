@@ -106,6 +106,7 @@ tr.dragging{opacity:.35;}
 .cal-cell.today-cell{background:rgba(74,125,232,.07);}
 .cal-cell.holiday-cell{background:rgba(232,80,80,.04);}
 body.dark .cal-cell.holiday-cell{background:rgba(232,80,80,.08);}
+.cal-event{font-size:11px;padding:2px 6px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-weight:500;}
 .day-num{font-size:13px;font-weight:600;margin-bottom:3px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;}
 .cal-cell.today-cell .day-num{background:var(--accent);color:#fff;}
 /* Calendar span event bar */
@@ -155,7 +156,8 @@ body.dark .cal-cell.holiday-cell{background:rgba(232,80,80,.08);}
     <h1>📅 프로젝트 일정 관리</h1>
     <p class="subtitle">Gantt · Calendar · Timeline — Confluence / Markdown 임베드용</p>
   </div>
-  <div style="display:flex;gap:8px;">
+  <div style="display:flex;gap:8px;align-items:center;">
+    <span id="save-indicator" style="font-size:12px;color:var(--text-muted);"></span>
     <button class="btn" onclick="resetAll()">🗑 초기화</button>
     <button class="btn" onclick="importJSON()">📂 불러오기</button>
     <button class="btn" id="theme-btn" onclick="toggleTheme()">🌙 다크</button>
@@ -423,7 +425,58 @@ function workDaysBetween(a,b){
 }
 function gmap(){const m={};groups.forEach(g=>{m[g]=[];});tasks.forEach(t=>{(m[t.group]||(m[t.group]=[])).push(t);});return m;}
 function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
-function renderAll(){saveSc();renderGantt();renderCalendar();renderTimeline();}
+// ══════════════════════════════════════
+// LOCAL STORAGE 자동저장
+// ══════════════════════════════════════
+const STORAGE_KEY='project-schedule-v1';
+let saveTimer=null;
+
+function saveToStorage(){
+  saveSc();
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({scenarios,curScId,scNextId}));
+    showSaveIndicator('✓ 자동저장됨');
+  }catch(e){
+    showSaveIndicator('⚠ 저장 실패');
+  }
+}
+
+function loadFromStorage(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(d.scenarios&&d.scenarios.length>0){
+      scenarios=d.scenarios;
+      curScId=d.curScId||d.scenarios[0].id;
+      scNextId=d.scNextId||99;
+      loadSc(curScId);
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function showSaveIndicator(msg){
+  const el=$('save-indicator');
+  if(!el)return;
+  el.textContent=msg;
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.textContent='',3000);
+}
+
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(saveToStorage, 800);
+}
+
+function renderAll(){
+  saveSc();
+  renderGantt();
+  renderCalendar();
+  renderTimeline();
+  scheduleSave();
+}
 
 // ══════════════════════════════════════
 // TABS & THEME
@@ -447,6 +500,7 @@ function resetAll(){
   scenarios=[{id:1,name:'1안',groups:[],tasks:[],nextId:1}];
   curScId=1;scNextId=2;
   loadSc(1);
+  try{localStorage.removeItem(STORAGE_KEY);}catch(e){}
   renderScenarioBar();
   renderAll();
 }
@@ -656,69 +710,30 @@ function renderCalendar(){
   const rem=(first.getDay()+last.getDate())%7;
   if(rem) for(let d=1;d<=7-rem;d++)   dates.push({date:new Date(calY,calM+1,d),other:true});
 
-  // 작업 슬롯 배정 (주말/공휴일 제외)
-  const taskRows={};
-  const slotMap={};
-  dates.forEach(({date})=>{slotMap[fd(date)]=[];});
-  [...tasks].sort((a,b)=>a.start.localeCompare(b.start)).forEach(t=>{
-    let row=0;
-    while(true){
-      let conflict=false;
-      for(const {date} of dates){
-        const ds=fd(date);
-        if(isOffDay(ds))continue; // 주말/휴일 건너뜀
-        if(ds>=t.start&&ds<=t.end&&slotMap[ds]&&slotMap[ds][row]){conflict=true;break;}
-      }
-      if(!conflict)break;
-      row++;
-    }
-    taskRows[t.id]=row;
-    dates.forEach(({date})=>{
-      const ds=fd(date);
-      if(isOffDay(ds))return; // 주말/휴일에는 슬롯 배정 안 함
-      if(ds>=t.start&&ds<=t.end){
-        if(!slotMap[ds])slotMap[ds]=[];
-        slotMap[ds][row]=t.id;
-      }
-    });
-  });
-  const MAX_ROWS=4;
-
   let h='';
   dates.forEach(({date,other})=>{
     const ds=fd(date);
     const hday=holiday(ds);
     const isWknd=date.getDay()===0||date.getDay()===6;
+    const isOff=isOffDay(ds);
     const isRed=isWknd||hday;
     const cls='cal-cell'+(other?' other':'')+(ds===today?' today-cell':'')+(hday?' holiday-cell':'');
     const dnStyle=isRed&&ds!==today?'color:var(--red);':'';
     const hdayLbl=hday?`<div style="font-size:10px;color:var(--red);margin-bottom:2px;font-weight:600;">${hday}</div>`:'';
 
+    // 주말/공휴일은 작업 표시 안 함
     let evHtml='';
-    const isOff=isOffDay(ds);
     if(!isOff){
-      for(let row=0;row<MAX_ROWS;row++){
-        const tid=(slotMap[ds]||[])[row];
-        if(!tid){evHtml+=`<div class="cal-ev-placeholder"></div>`;continue;}
-        const t=tasks.find(x=>x.id===tid);
-        if(!t){evHtml+=`<div class="cal-ev-placeholder"></div>`;continue;}
-        const isStart=ds===t.start, isEnd=ds===t.end;
-        const isWeekStart=date.getDay()===0, isWeekEnd=date.getDay()===6;
-        const showLabel=isStart||isWeekStart;
-        let spanCls='span-mid';
-        if(isStart&&isEnd)spanCls='span-only';
-        else if(isStart||isWeekStart)spanCls='span-start';
-        else if(isEnd||isWeekEnd)spanCls='span-end';
-        evHtml+=`<div class="cal-ev ${spanCls}" style="background:${t.color}28;color:${t.color};" onclick="openModal(${t.id})">
-          ${showLabel?t.name:''}
-        </div>`;
-      }
+      const dt=tasks.filter(t=>t.start<=ds&&t.end>=ds);
+      evHtml=dt.slice(0,3).map(t=>
+        `<div class="cal-event" style="background:${t.color}22;color:${t.color}" onclick="openModal(${t.id})">${t.name}</div>`
+      ).join('');
+      if(dt.length>3) evHtml+=`<div style="font-size:10px;color:var(--text-muted);padding:1px 4px">+${dt.length-3}개</div>`;
     }
-    const extra=isOff?0:Object.values(slotMap[ds]||[]).filter(Boolean).length-MAX_ROWS;
+
     h+=`<div class="${cls}">
       <div class="day-num" style="${dnStyle}">${date.getDate()}</div>
       ${hdayLbl}${evHtml}
-      ${extra>0?`<div style="font-size:10px;color:var(--text-muted);padding:1px 4px">+${extra}개</div>`:''}
     </div>`;
   });
   $('cal-cells').innerHTML=h;
@@ -973,8 +988,13 @@ function importJSON(){
 }
 
 // INIT
+const _loaded = loadFromStorage();
+if(!_loaded) loadSc(1);
 renderScenarioBar();
-renderAll();
+renderGantt();
+renderCalendar();
+renderTimeline();
+if(_loaded) showSaveIndicator('💾 이전 작업을 불러왔어요');
 </script>
 </body>
 </html>
