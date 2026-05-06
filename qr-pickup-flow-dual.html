@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR 수령 개선 Flow - 고객 / 직원 관점</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #161b24;
+    --surface2: #1e2535;
+    --border: #2a3347;
+    --customer: #b794ff;
+    --customer-bg: rgba(183,148,255,0.1);
+    --staff: #3d9aff;
+    --staff-bg: rgba(61,154,255,0.1);
+    --accent2: #00e5a0;
+    --warn: #ff9b3d;
+    --danger: #ff4d6a;
+    --text: #e8edf5;
+    --muted: #6b7a99;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 16px 60px;
+  }
+
+  .page-title {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .page-title h1 {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .page-title h1 .gr {
+    background: linear-gradient(90deg, var(--customer), var(--staff));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .page-title p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Persona Section */
+  .persona-section {
+    max-width: 1400px;
+    margin: 0 auto 50px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .persona-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .persona-section.customer .persona-header {
+    background: linear-gradient(135deg, var(--customer-bg), transparent);
+  }
+  .persona-section.staff .persona-header {
+    background: linear-gradient(135deg, var(--staff-bg), transparent);
+  }
+
+  .persona-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+  .customer .persona-avatar {
+    background: var(--customer-bg);
+    border: 1px solid var(--customer);
+  }
+  .staff .persona-avatar {
+    background: var(--staff-bg);
+    border: 1px solid var(--staff);
+  }
+
+  .persona-info { flex: 1; }
+  .persona-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+  }
+  .customer .persona-tag { color: var(--customer); }
+  .staff .persona-tag { color: var(--staff); }
+
+  .persona-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .persona-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* Flow */
+  .flow {
+    display: flex;
+    gap: 0;
+    padding: 28px 20px;
+    overflow-x: auto;
+    align-items: flex-start;
+  }
+
+  .step {
+    min-width: 230px;
+    flex-shrink: 0;
+  }
+
+  .step-label {
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .step-num {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    color: #fff;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .customer .step-num { background: var(--customer); }
+  .staff .step-num { background: var(--staff); }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 700;
+    display: block;
+  }
+  .step-desc {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+    display: block;
+    line-height: 1.5;
+  }
+
+  /* Phone */
+  .phone {
+    width: 230px;
+    background: var(--surface2);
+    border-radius: 24px;
+    border: 2px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  }
+
+  .statusbar {
+    padding: 8px 16px 6px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(0,0,0,0.2);
+  }
+
+  .app-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.15);
+  }
+  .app-header .back { font-size: 14px; cursor: pointer; }
+  .customer .app-header .back { color: var(--customer); }
+  .staff .app-header .back { color: var(--staff); }
+  .app-header h2 { font-size: 13px; font-weight: 700; flex: 1; }
+  .app-header .badge {
+    font-size: 9px;
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 700;
+  }
+  .customer .app-header .badge { background: var(--customer); }
+  .staff .app-header .badge { background: var(--staff); }
+
+  .screen { padding: 14px; min-height: 380px; position: relative; }
+
+  /* Connector */
+  .connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 8px 0;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .connector .arr { font-size: 18px; }
+
+  /* ===== Customer Specific ===== */
+
+  /* Customer order list (overview before showing QR) */
+  .my-orders-banner {
+    background: linear-gradient(135deg, var(--customer-bg), rgba(0,229,160,0.05));
+    border: 1px solid rgba(183,148,255,0.3);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .banner-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--customer);
+    margin-bottom: 4px;
+  }
+  .banner-sub {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .order-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .order-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .order-item-num {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .order-item-status {
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 700;
+  }
+  .status-waiting { background: rgba(255,155,61,0.15); color: var(--warn); }
+  .status-ready { background: rgba(0,229,160,0.15); color: var(--accent2); }
+  .status-done { background: rgba(107,122,153,0.2); color: var(--muted); }
+  .order-item-products {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* QR display screen */
+  .qr-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+  }
+  .qr-name {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .qr-meta {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .qr-card {
+    background: white;
+    padding: 18px;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .qr-grid {
+    width: 130px;
+    height: 130px;
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    gap: 2px;
+  }
+  .qr-cell { background: #0d0f14; border-radius: 1px; }
+  .qr-cell.light { background: white; }
+  .qr-info-strip {
+    background: var(--customer-bg);
+    border: 1px solid rgba(183,148,255,0.3);
+    border-radius: 10px;
+    padding: 10px;
+    width: 100%;
+    text-align: center;
+  }
+  .qr-strip-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--customer);
+    margin-bottom: 2px;
+  }
+  .qr-strip-sub {
+    font-size: 9px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .qr-count-pills {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    justify-content: center;
+  }
+  .pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px 9px;
+    font-size: 9px;
+  }
+  .pill strong { color: var(--customer); font-weight: 700; }
+
+  /* Customer notification (push) */
+  .notification {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .notif-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .notif-icon {
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    background: var(--customer);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .notif-app { font-size: 10px; color: var(--muted); flex: 1; }
+  .notif-time { font-size: 9px; color: var(--muted); }
+  .notif-title { font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+  .notif-body { font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+  /* Receipt */
+  .receipt {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .receipt-h {
+    text-align: center;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+  .receipt-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--accent2);
+  }
+  .receipt-meta {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 10px;
+    border-bottom: 1px dashed rgba(255,255,255,0.05);
+  }
+  .receipt-row:last-child { border: none; }
+  .receipt-row .lbl { color: var(--muted); }
+  .receipt-row .v { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .receipt-row .v.green { color: var(--accent2); }
+  .receipt-row .v.warn { color: var(--warn); }
+
+  /* ===== Staff Specific ===== */
+
+  /* Scanner */
+  .scanner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+  }
+  .scan-frame {
+    width: 170px;
+    height: 170px;
+    border-radius: 14px;
+    background: #0a0c10;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .scan-frame::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--staff);
+    animation: scan 2s linear infinite;
+    box-shadow: 0 0 12px var(--staff);
+  }
+  @keyframes scan {
+    0% { top: 0; } 100% { top: 100%; }
+  }
+  .scan-corner {
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: var(--staff);
+    border-style: solid;
+  }
+  .scan-corner.tl { top: 8px; left: 8px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+  .scan-corner.tr { top: 8px; right: 8px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+  .scan-corner.bl { bottom: 8px; left: 8px; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+  .scan-corner.br { bottom: 8px; right: 8px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+  .scan-mock-qr {
+    position: absolute;
+    inset: 28px;
+    display: grid;
+    grid-template-columns: repeat(7,1fr);
+    grid-template-rows: repeat(7,1fr);
+    gap: 1px;
+    opacity: 0.3;
+  }
+  .scan-mock-qr div {
+    background: var(--text);
+    border-radius: 1px;
+  }
+  .scan-mock-qr div:nth-child(odd) { background: var(--muted); }
+
+  .scan-label {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .scan-label strong { color: var(--text); display: block; font-size: 12px; margin-bottom: 3px; }
+
+  /* Customer summary on staff side */
+  .customer-card {
+    background: linear-gradient(135deg, var(--staff-bg), transparent);
+    border: 1px solid rgba(61,154,255,0.3);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .customer-card-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .customer-icon {
+    width: 32px; height: 32px;
+    background: var(--staff);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .customer-name {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+  .customer-detail {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 6px;
+  }
+  .stat-box {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .stat-num {
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat-label {
+    font-size: 8px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .stat-box.green .stat-num { color: var(--accent2); }
+  .stat-box.warn .stat-num { color: var(--warn); }
+
+  /* Order card for staff */
+  .order-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .order-card.selected {
+    border-color: var(--staff);
+    box-shadow: 0 0 0 1px var(--staff);
+  }
+  .order-card.partial {
+    border-color: var(--warn);
+    box-shadow: 0 0 0 1px var(--warn);
+  }
+  .order-card-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .checkbox {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .checkbox.on { background: var(--staff); border-color: var(--staff); }
+  .checkbox.on::after { content: '✓'; color: white; font-size: 10px; font-weight: 900; }
+  .checkbox.partial-mark {
+    background: var(--warn);
+    border-color: var(--warn);
+  }
+  .checkbox.partial-mark::after { content: '–'; color: white; font-size: 12px; font-weight: 900; line-height: 1; }
+
+  .o-num {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    flex: 1;
+  }
+  .o-status {
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 700;
+  }
+  .o-items { padding: 6px 10px 8px; }
+  .o-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    font-size: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .o-row:last-child { border-bottom: none; }
+  .o-row .ico { font-size: 12px; width: 18px; text-align: center; }
+  .o-row .nm { flex: 1; font-weight: 500; }
+  .o-row .qt { color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* Bottom action */
+  .bottom-action {
+    background: linear-gradient(to top, var(--surface2) 70%, transparent);
+    padding: 12px 14px 14px;
+    margin: 0 -14px -14px;
+  }
+  .action-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 10px;
+  }
+  .action-summary .count { color: var(--muted); }
+  .action-summary .total { font-weight: 700; }
+
+  .btn-primary {
+    width: 100%;
+    color: #fff;
+    border: none;
+    border-radius: 11px;
+    padding: 11px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .customer .btn-primary { background: var(--customer); }
+  .staff .btn-primary { background: var(--staff); }
+  .btn-primary.success { background: var(--accent2); color: #0d0f14; }
+  .btn-outline {
+    width: 100%;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 8px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 6px;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: flex-end;
+    z-index: 10;
+  }
+  .modal-sheet {
+    width: 100%;
+    background: var(--surface2);
+    border-radius: 18px 18px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 14px;
+  }
+  .modal-handle {
+    width: 36px; height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 10px;
+  }
+  .modal-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .modal-sub { font-size: 10px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+
+  .item-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .item-select-row:last-child { border: none; }
+  .item-toggle {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .item-toggle.on { background: var(--accent2); border-color: var(--accent2); color: #0d0f14; font-weight: 900; font-size: 11px; }
+
+  /* Success */
+  .success-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 380px;
+    gap: 12px;
+    text-align: center;
+  }
+  .success-icon {
+    width: 60px; height: 60px;
+    background: rgba(0,229,160,0.15);
+    border: 2px solid var(--accent2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+  }
+  .success-screen h3 { font-size: 14px; font-weight: 700; }
+  .success-screen p { font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+  /* Callout */
+  .callout {
+    border-radius: 0 8px 8px 0;
+    padding: 8px 10px;
+    margin-top: 10px;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .customer .callout {
+    background: rgba(183,148,255,0.06);
+    border-left: 3px solid var(--customer);
+  }
+  .customer .callout strong { color: var(--customer); display: block; margin-bottom: 2px; }
+  .staff .callout {
+    background: rgba(61,154,255,0.06);
+    border-left: 3px solid var(--staff);
+  }
+  .staff .callout strong { color: var(--staff); display: block; margin-bottom: 2px; }
+
+  /* Section divider */
+  .divider {
+    max-width: 1400px;
+    margin: 0 auto;
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    position: relative;
+    padding: 0 0 20px;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 30%;
+    height: 1px;
+    background: var(--border);
+  }
+  .divider::before { left: 5%; }
+  .divider::after { right: 5%; }
+
+  /* Summary box */
+  .summary-box {
+    max-width: 1400px;
+    margin: 50px auto 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .summary-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    background: linear-gradient(90deg, var(--customer), var(--staff));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .summary-col h4 {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .summary-col.customer h4 { color: var(--customer); }
+  .summary-col.staff h4 { color: var(--staff); }
+  .summary-col p {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .summary-col p span {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* Toggle indicator */
+  .qr-mode-toggle {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px;
+    margin-bottom: 12px;
+  }
+  .qr-mode-toggle div {
+    flex: 1;
+    text-align: center;
+    padding: 5px 8px;
+    font-size: 9px;
+    font-weight: 600;
+    border-radius: 17px;
+    color: var(--muted);
+  }
+  .qr-mode-toggle div.active {
+    background: var(--customer);
+    color: white;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>📱 QR 수령 개선 Flow — <span class="gr">고객 / 현장 직원</span> 관점</h1>
+  <p>두 사용자의 화면 흐름을 동시에 비교</p>
+</div>
+
+<!-- ============================================== -->
+<!-- 고객(주문자) Flow                                   -->
+<!-- ============================================== -->
+<div class="persona-section customer">
+  <div class="persona-header">
+    <div class="persona-avatar">🛍️</div>
+    <div class="persona-info">
+      <div class="persona-tag">PERSONA A</div>
+      <div class="persona-name">주문자 (고객)</div>
+      <div class="persona-desc">현장에서 본인 주문을 수령하기 위해 QR 코드 화면을 직원에게 보여주는 사용자</div>
+    </div>
+  </div>
+
+  <div class="flow">
+
+    <!-- C-STEP 1: 내 주문 목록 -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num">STEP 1</span>
+        <span class="step-title">내 주문 확인</span>
+        <span class="step-desc">현장 도착 후<br>미수령 주문 한눈에</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:38</span><span>●●● 5G 🔋</span></div>
+        <div class="app-header">
+          <h2>내 주문</h2>
+          <span class="badge">3</span>
+        </div>
+        <div class="screen">
+          <div class="my-orders-banner">
+            <div class="banner-title">🎫 미수령 주문 3건</div>
+            <div class="banner-sub">통합 QR로 한 번에 수령하거나<br>주문별로 따로 수령할 수 있어요</div>
+          </div>
+
+          <div class="order-item">
+            <div class="order-item-top">
+              <span class="order-item-num">#ORD-001</span>
+              <span class="order-item-status status-ready">수령가능</span>
+            </div>
+            <div class="order-item-products">아메리카노×2, 크루아상×1</div>
+          </div>
+          <div class="order-item">
+            <div class="order-item-top">
+              <span class="order-item-num">#ORD-002</span>
+              <span class="order-item-status status-ready">수령가능</span>
+            </div>
+            <div class="order-item-products">오렌지주스×3</div>
+          </div>
+          <div class="order-item">
+            <div class="order-item-top">
+              <span class="order-item-num">#ORD-003</span>
+              <span class="order-item-status status-waiting">준비중</span>
+            </div>
+            <div class="order-item-products">치즈케이크×2, 라떼×1</div>
+          </div>
+
+          <button class="btn-primary" style="margin-top:6px">통합 QR 코드 보기</button>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>💡 변경점</strong>
+        주문별 QR이 아닌 "통합 QR" 진입 동선 제공
+      </div>
+    </div>
+
+    <div class="connector"><div class="arr">▶</div></div>
+
+    <!-- C-STEP 2: 통합 QR 화면 -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num">STEP 2</span>
+        <span class="step-title">통합 QR 표시</span>
+        <span class="step-desc">직원에게<br>QR 화면 제시</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:39</span><span>●●● 5G 🔋</span></div>
+        <div class="app-header">
+          <span class="back">←</span>
+          <h2>수령 QR</h2>
+        </div>
+        <div class="screen">
+          <div class="qr-mode-toggle">
+            <div class="active">통합 QR</div>
+            <div>주문별 QR</div>
+          </div>
+
+          <div class="qr-display">
+            <div class="qr-name">김현지님</div>
+            <div class="qr-meta">통합 QR · 3건 주문 포함<br><span style="color:var(--accent2)">●</span> 화면 밝기 자동 최대</div>
+
+            <div class="qr-card">
+              <div class="qr-grid" id="qrgrid"></div>
+            </div>
+
+            <div class="qr-info-strip">
+              <div class="qr-strip-title">한 번 스캔으로 모든 주문 처리</div>
+              <div class="qr-strip-sub">직원이 스캔 시 수령할 주문을<br>선택할 수 있어요</div>
+              <div class="qr-count-pills">
+                <div class="pill"><strong>3</strong> 주문</div>
+                <div class="pill"><strong>6</strong> 상품</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>💡 변경점</strong>
+        주문 1건당 QR → 사용자 단위 통합 QR (필요시 주문별 QR도 선택 가능)
+      </div>
+    </div>
+
+    <div class="connector"><div class="arr">▶</div></div>
+
+    <!-- C-STEP 3: 처리중 (선택) -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num">STEP 3</span>
+        <span class="step-title">처리 알림</span>
+        <span class="step-desc">직원이 처리 시작 시<br>실시간 푸시 수신</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:40</span><span>●●● 5G 🔋</span></div>
+        <div class="app-header">
+          <h2>알림</h2>
+        </div>
+        <div class="screen" style="background:rgba(0,0,0,0.15)">
+          <div class="notification">
+            <div class="notif-top">
+              <div class="notif-icon">📦</div>
+              <div class="notif-app">픽업알리미</div>
+              <div class="notif-time">방금</div>
+            </div>
+            <div class="notif-title">수령 처리가 시작되었어요</div>
+            <div class="notif-body">직원이 #ORD-001, #ORD-002를<br>수령 처리 중입니다</div>
+          </div>
+
+          <div class="notification" style="opacity:0.85">
+            <div class="notif-top">
+              <div class="notif-icon" style="background:var(--accent2)">✓</div>
+              <div class="notif-app">픽업알리미</div>
+              <div class="notif-time">10초 전</div>
+            </div>
+            <div class="notif-title">수령 완료!</div>
+            <div class="notif-body">2건 수령 완료, 1건 미수령으로 유지<br>탭하여 자세히 보기</div>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>💡 변경점</strong>
+        직원의 처리 진행을 실시간으로 인지 → 신뢰감 ↑
+      </div>
+    </div>
+
+    <div class="connector"><div class="arr">▶</div></div>
+
+    <!-- C-STEP 4: 수령 완료 영수증 -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num">STEP 4</span>
+        <span class="step-title">수령 결과 확인</span>
+        <span class="step-desc">완료된 주문<br>잔여 주문 분리 표시</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="app-header">
+          <span class="back">←</span>
+          <h2>수령 결과</h2>
+        </div>
+        <div class="screen">
+          <div class="receipt">
+            <div class="receipt-h">
+              <div class="receipt-title">✓ 수령 완료</div>
+              <div class="receipt-meta">2024.05.12 09:41</div>
+            </div>
+            <div class="receipt-row">
+              <span class="lbl">#ORD-001</span>
+              <span class="v green">완료</span>
+            </div>
+            <div class="receipt-row">
+              <span class="lbl">#ORD-002</span>
+              <span class="v warn">부분수령</span>
+            </div>
+            <div class="receipt-row">
+              <span class="lbl">#ORD-003</span>
+              <span class="v" style="color:var(--muted)">미수령</span>
+            </div>
+            <div class="receipt-row" style="margin-top:6px;border-top:1px dashed var(--border);padding-top:8px">
+              <span class="lbl">받은 상품</span>
+              <span class="v">총 6개</span>
+            </div>
+          </div>
+
+          <div style="background:rgba(255,155,61,0.08); border:1px solid rgba(255,155,61,0.3); border-radius:10px; padding:10px; margin-top:10px;">
+            <div style="font-size:10px; font-weight:700; color:var(--warn); margin-bottom:3px">⚠️ 잔여 미수령 1건</div>
+            <div style="font-size:9px; color:var(--muted); line-height:1.5">#ORD-003 (치즈케이크 등)<br>다음 방문 시 동일 QR로 수령 가능</div>
+          </div>
+
+          <button class="btn-primary" style="margin-top:10px">홈으로</button>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>💡 변경점</strong>
+        부분 수령 / 미수령 잔여 명확히 구분 → 분쟁 방지
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="divider">SCAN ← → SHOW</div>
+
+<!-- ============================================== -->
+<!-- 현장 직원 Flow                                       -->
+<!-- ============================================== -->
+<div class="persona-section staff">
+  <div class="persona-header">
+    <div class="persona-avatar">👨‍💼</div>
+    <div class="persona-info">
+      <div class="persona-tag">PERSONA B</div>
+      <div class="persona-name">현장 직원</div>
+      <div class="persona-desc">고객의 QR 코드를 스캔하여 주문을 확인하고 수령 처리하는 사용자</div>
+    </div>
+  </div>
+
+  <div class="flow">
+
+    <!-- S-STEP 1: 스캔 -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num">STEP 1</span>
+        <span class="step-title">QR 스캔</span>
+        <span class="step-desc">고객 QR<br>한 번만 스캔</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:40</span><span>●●● WiFi 🔋</span></div>
+        <div class="app-header">
+          <span class="back">←</span>
+          <h2>주문 스캔</h2>
+        </div>
+        <div class="screen">
+          <div class="scanner">
+            <div class="scan-frame">
+              <div class="scan-corner tl"></div>
+              <div class="scan-corner tr"></div>
+              <div class="scan-corner bl"></div>
+              <div class="scan-corner br"></div>
+              <div class="scan-mock-qr">
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+                <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+              </div>
+            </div>
+            <div class="scan-label">
+              <strong>고객의 QR을 스캔하세요</strong>
+              통합 QR / 개별 주문 QR<br>모두 인식됩니다
+            </div>
+          </div>
+
+          <div style="display:flex; gap:6px; margin-top:14px;">
+            <button class="btn-outline" style="margin:0; flex:1; padding:8px;">수동 입력</button>
+            <button class="btn-outline" style="margin:0; flex:1; padding:8px;">조명 ON</button>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>💡 변경점</strong>
+        통합 QR이든 기존 주문 QR이든 모두 같은 화면으로 진입
+      </div>
+    </div>
+
+    <div class="connector"><div class="arr">▶</div></div>
+
+    <!-- S-STEP 2: 주문 목록 + 선택 -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num">STEP 2</span>
+        <span class="step-title">주문 목록 & 선택</span>
+        <span class="step-desc">고객의 모든 미수령 주문<br>일괄 표시</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:40</span><span>●●● WiFi 🔋</span></div>
+        <div class="app-header">
+          <span class="back">←</span>
+          <h2>수령 처리</h2>
+          <span class="badge">3건</span>
+        </div>
+        <div class="screen">
+          <div class="customer-card">
+            <div class="customer-card-top">
+              <div class="customer-icon">👤</div>
+              <div>
+                <div class="customer-name">김현지</div>
+                <div class="customer-detail">010-****-3421 · 단골 ★</div>
+              </div>
+            </div>
+            <div class="stats-row">
+              <div class="stat-box">
+                <div class="stat-num">3</div>
+                <div class="stat-label">주문</div>
+              </div>
+              <div class="stat-box green">
+                <div class="stat-num">2</div>
+                <div class="stat-label">수령가능</div>
+              </div>
+              <div class="stat-box warn">
+                <div class="stat-num">1</div>
+                <div class="stat-label">준비중</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="order-card selected">
+            <div class="order-card-h">
+              <div class="checkbox on"></div>
+              <span class="o-num">#ORD-001</span>
+              <span class="o-status status-ready">수령가능</span>
+            </div>
+            <div class="o-items">
+              <div class="o-row">
+                <span class="ico">☕</span>
+                <span class="nm">아메리카노 (L)</span>
+                <span class="qt">×2</span>
+              </div>
+              <div class="o-row">
+                <span class="ico">🥐</span>
+                <span class="nm">크루아상</span>
+                <span class="qt">×1</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="order-card selected">
+            <div class="order-card-h">
+              <div class="checkbox on"></div>
+              <span class="o-num">#ORD-002</span>
+              <span class="o-status status-ready">수령가능</span>
+            </div>
+            <div class="o-items">
+              <div class="o-row">
+                <span class="ico">🧃</span>
+                <span class="nm">오렌지 주스</span>
+                <span class="qt">×3</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="order-card" style="opacity:0.55">
+            <div class="order-card-h">
+              <div class="checkbox" style="border-color:var(--warn)"></div>
+              <span class="o-num">#ORD-003</span>
+              <span class="o-status status-waiting">준비중</span>
+            </div>
+          </div>
+
+          <div class="bottom-action">
+            <div class="action-summary">
+              <span class="count">2건 선택 · 6개 상품</span>
+              <span class="total" style="color:var(--staff)">처리 준비</span>
+            </div>
+            <button class="btn-primary">선택한 주문 수령 처리</button>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>💡 변경점</strong>
+        주문별 상품 펼쳐서 시각 확인 + 체크박스로 수령 주문 선택
+      </div>
+    </div>
+
+    <div class="connector"><div class="arr">▶</div></div>
+
+    <!-- S-STEP 3: 부분 수령 (분기) -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num" style="background:var(--warn)">STEP 3 (분기)</span>
+        <span class="step-title">부분 수령 처리</span>
+        <span class="step-desc">상품 단위 선택<br>(필요한 경우만)</span>
+      </div>
+      <div class="phone" style="position:relative">
+        <div class="statusbar"><span>9:40</span><span>●●● WiFi 🔋</span></div>
+        <div class="app-header">
+          <h2>수령 처리</h2>
+          <span class="badge">3건</span>
+        </div>
+        <div class="screen" style="filter:blur(1px); padding-bottom:0">
+          <div class="order-card partial">
+            <div class="order-card-h">
+              <div class="checkbox partial-mark"></div>
+              <span class="o-num">#ORD-001</span>
+              <span class="o-status status-partial" style="background:rgba(255,155,61,0.15);color:var(--warn)">일부수령</span>
+            </div>
+          </div>
+          <div class="order-card selected">
+            <div class="order-card-h">
+              <div class="checkbox on"></div>
+              <span class="o-num">#ORD-002</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay">
+          <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-title">상품 단위 수령</div>
+            <div class="modal-sub">#ORD-001 주문 중 수령할 상품만<br>선택해주세요. 미선택 상품은 미수령 유지됩니다.</div>
+
+            <div class="item-select-row">
+              <div class="item-toggle on">✓</div>
+              <span style="font-size:12px;flex:1">☕ 아메리카노 (L)</span>
+              <span style="font-size:10px; color:var(--muted)">×2</span>
+            </div>
+            <div class="item-select-row">
+              <div class="item-toggle"></div>
+              <span style="font-size:12px;color:var(--muted);flex:1">🥐 크루아상</span>
+              <span style="font-size:10px; color:var(--muted)">×1</span>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:8px">
+              <button class="btn-outline" style="flex:1; margin:0; padding:9px">취소</button>
+              <button class="btn-primary" style="flex:2; padding:9px">선택 확인 (1/2)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="callout" style="border-color:var(--warn);background:rgba(255,155,61,0.06)">
+        <strong style="color:var(--warn)">💡 케이스 처리</strong>
+        주문 내에서 일부 상품만 받고 싶을 때 진입하는 분기
+      </div>
+    </div>
+
+    <div class="connector"><div class="arr">▶</div></div>
+
+    <!-- S-STEP 4: 처리 완료 -->
+    <div class="step">
+      <div class="step-label">
+        <span class="step-num" style="background:var(--accent2);color:#0d0f14">STEP 4</span>
+        <span class="step-title">처리 완료</span>
+        <span class="step-desc">결과 요약 +<br>고객에게 자동 푸시</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:41</span><span>●●● WiFi 🔋</span></div>
+        <div class="app-header">
+          <h2>처리 완료</h2>
+        </div>
+        <div class="screen">
+          <div class="success-screen">
+            <div class="success-icon">✓</div>
+            <h3>수령 처리 완료</h3>
+            <p>김현지 고객<br>처리 결과를 자동 전송했습니다</p>
+
+            <div class="receipt" style="width:100%">
+              <div class="receipt-row">
+                <span class="lbl">#ORD-001</span>
+                <span class="v warn">부분수령 (1/2)</span>
+              </div>
+              <div class="receipt-row">
+                <span class="lbl">#ORD-002</span>
+                <span class="v green">완료</span>
+              </div>
+              <div class="receipt-row">
+                <span class="lbl">#ORD-003</span>
+                <span class="v" style="color:var(--muted)">미수령</span>
+              </div>
+              <div class="receipt-row" style="border-top:1px dashed var(--border);margin-top:4px;padding-top:8px">
+                <span class="lbl">처리 상품</span>
+                <span class="v">5 / 8개</span>
+              </div>
+            </div>
+
+            <button class="btn-primary success">다음 고객</button>
+            <button class="btn-outline">처리 내역</button>
+          </div>
+        </div>
+      </div>
+      <div class="callout" style="border-color:var(--accent2);background:rgba(0,229,160,0.06)">
+        <strong style="color:var(--accent2)">💡 변경점</strong>
+        다음 고객 응대로 빠른 전환 + 모든 주문 상태 자동 동기화
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="summary-box">
+  <div class="summary-title">📋 두 관점 비교 요약</div>
+  <div class="summary-grid">
+    <div class="summary-col customer">
+      <h4>🛍️ 주문자 (고객) 관점</h4>
+      <p>
+        ① <span>내 주문 목록</span>에서 미수령 주문 한눈에 확인<br>
+        ② <span>통합 QR</span> 또는 주문별 QR 선택 가능<br>
+        ③ 직원 처리 시 <span>실시간 푸시 알림</span> 수신<br>
+        ④ <span>부분/미수령 잔여</span> 명확히 분리되어 결과 확인
+      </p>
+    </div>
+    <div class="summary-col staff">
+      <h4>👨‍💼 현장 직원 관점</h4>
+      <p>
+        ① QR 한 번 스캔 → <span>고객의 모든 미수령 주문 일괄 표시</span><br>
+        ② 주문별 상품 펼침 + <span>체크박스로 수령 주문 선택</span><br>
+        ③ 필요 시 <span>상품 단위 부분 수령</span> 분기 진입<br>
+        ④ 처리 완료 후 <span>다음 고객 응대로 즉시 전환</span>
+      </p>
+    </div>
+  </div>
+
+  <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+    <div style="font-size:12px; color:var(--text); margin-bottom:6px;">🔄 두 관점의 연결 지점</div>
+    <div style="font-size:11px; color:var(--muted); line-height:1.7;">
+      고객의 <span style="color:var(--customer)">통합 QR 표시 (STEP 2)</span> ↔ 직원의 <span style="color:var(--staff)">QR 스캔 (STEP 1)</span> 에서 데이터 동기화 →
+      직원의 처리 진행은 고객 화면에 <span style="color:var(--customer)">푸시 알림 (STEP 3)</span> 으로 실시간 반영
+    </div>
+  </div>
+</div>
+
+<script>
+  // QR mock generator for customer screen
+  const grid = document.getElementById('qrgrid');
+  if (grid) {
+    const pattern = [
+      1,1,1,0,1,0,1,1,1,
+      1,0,1,0,0,1,1,0,1,
+      1,1,1,0,1,0,1,1,1,
+      0,0,0,1,1,0,0,0,0,
+      1,0,1,1,0,1,0,1,0,
+      0,1,0,0,1,0,1,0,1,
+      1,0,1,0,1,1,0,1,1,
+      0,1,1,1,0,0,1,0,0,
+      1,1,1,1,1,0,1,1,1
+    ];
+    pattern.forEach(p => {
+      const c = document.createElement('div');
+      c.className = 'qr-cell ' + (p ? '' : 'light');
+      grid.appendChild(c);
+    });
+  }
+</script>
+
+</body>
+</html>
